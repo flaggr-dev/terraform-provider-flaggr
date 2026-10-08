@@ -1,0 +1,76 @@
+# Release configuration for the Terraform Registry, following HashiCorp's
+# provider scaffolding: https://github.com/hashicorp/terraform-provider-scaffolding-framework
+# Docs: https://goreleaser.com
+version: 2
+
+builds:
+  - env:
+      # Static binaries: CGO would complicate use in CI/CD systems such as
+      # HCP Terraform, where users can't install libraries.
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w -X main.version={{ .Version }}"
+    goos:
+      - freebsd
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - "386"
+      - arm
+      - arm64
+      - s390x
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: s390x
+      - goos: freebsd
+        goarch: s390x
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: s390x
+    binary: "{{ .ProjectName }}_v{{ .Version }}"
+
+archives:
+  - formats:
+      - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      # Non-interactive: the release workflow imports the key and presets its
+      # passphrase in gpg-agent (crazy-max/ghaction-import-gpg).
+      - "--batch"
+      - "--pinentry-mode"
+      - "loopback"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+release:
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+  draft: false
+  footer: |
+    See the [changelog](https://github.com/flaggr-dev/terraform-provider-flaggr/blob/{{ .Tag }}/CHANGELOG.md) and the [provider documentation](https://registry.terraform.io/providers/flaggr-dev/flaggr/latest/docs).
+
+changelog:
+  disable: true

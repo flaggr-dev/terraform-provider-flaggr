@@ -1,0 +1,15 @@
+# Build output
+/terraform-provider-flaggr
+/terraform-provider-flaggr_*
+/dist/
+
+# Terraform working files from trying the examples
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+
+.env
+.DS_Store
