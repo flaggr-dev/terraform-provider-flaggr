@@ -125,11 +125,11 @@ You need [Go](https://go.dev/doc/install) (the version in [`go.mod`](go.mod)) an
 make build      # build ./terraform-provider-flaggr
 make test       # unit tests
 make vet        # go vet
+make vuln       # govulncheck: known vulnerabilities in code the provider calls
 make docs       # regenerate docs/ with tfplugindocs
-make install    # install into ~/.terraform.d/plugins as version 0.1.0
 ```
 
-To try a local build, point Terraform at the directory that holds the binary with `dev_overrides` in your [CLI configuration](https://developer.hashicorp.com/terraform/cli/config/config-file) (`~/.terraformrc`), then run `terraform plan` without `terraform init`:
+To try a local build, point Terraform at the directory that holds the binary with `dev_overrides` in your [CLI configuration](https://developer.hashicorp.com/terraform/cli/config/config-file) (`~/.terraformrc`), and run `terraform plan` without `terraform init`. Until you remove the block, Terraform uses your build for `flaggr-dev/flaggr` in every configuration and warns that development overrides are in effect:
 
 ```hcl
 provider_installation {

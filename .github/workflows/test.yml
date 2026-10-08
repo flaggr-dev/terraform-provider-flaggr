@@ -45,6 +45,23 @@ jobs:
       - name: Unit tests
         run: go test -v -count=1 -cover ./...
 
+  vulncheck:
+    name: Known vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Fails when the provider calls code with a known vulnerability
+      # (https://vuln.go.dev), in a dependency or in the Go standard library.
+      - name: govulncheck
+        run: make vuln
+
   docs:
     name: Docs are up to date
     runs-on: ubuntu-latest

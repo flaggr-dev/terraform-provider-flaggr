@@ -20,7 +20,10 @@ description: |-
 
 ## Environments that require approval
 
-In an environment that is protected and requires approval (`protected_environment` and `require_approval` on `flaggr_environment`), creating or deleting a flag fails with HTTP 409 `APPROVAL_REQUIRED`, and Flaggr answers updates with a change request, which the provider doesn't handle yet. Create such flags in another environment and promote them in the Flaggr dashboard, and manage their changes there.
+In an environment that is protected and requires approval (`protected_environment` and `require_approval` on `flaggr_environment`), Terraform can't change flags directly:
+
+- Creating or deleting a flag fails with HTTP 409 `APPROVAL_REQUIRED`. Create the flag in another environment and promote it in the Flaggr dashboard; you can then import it.
+- An update doesn't change the flag. Flaggr opens a change request with your change instead, and `terraform apply` fails with **Flag change needs approval**, naming the request. The flag's state in Terraform stays as it was. Approve and apply the change request in Flaggr; the next `terraform plan` then shows no changes for the flag. Running `terraform apply` again before that opens another change request.
 
 {{ .SchemaMarkdown | trimspace }}
 {{- if or .HasImport .HasImportIDConfig }}

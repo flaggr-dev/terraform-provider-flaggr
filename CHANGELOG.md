@@ -1,8 +1,23 @@
 # Changelog
 
+## 0.1.1 (October 9, 2026)
+
+BUG FIXES:
+
+* resource/flaggr_flag: Updating a flag in place (for example `enabled`, `default_value`, `name`, `description` or `is_public`) failed with HTTP 400 `Missing required query parameter: serviceId`. The provider now names the flag's service and environment in the query string, where Flaggr looks for them.
+* resource/flaggr_flag: In an environment that requires approval, Flaggr answers an update with a change request instead of changing the flag. The update now fails with **Flag change needs approval**, naming the request, and Terraform keeps the flag's previous state until the request is applied.
+
+SECURITY:
+
+* Release binaries are built with google.golang.org/grpc v1.84.0, golang.org/x/net v0.59.0 and golang.org/x/text v0.42.0, which fix GO-2026-4762, GO-2026-5026, GO-2026-5970, GO-2026-6061, GO-2026-6348 and GO-2026-6443. Also updated: terraform-plugin-framework v1.19.0, terraform-plugin-go v0.31.0 and terraform-plugin-testing v1.16.0. Building the provider now needs Go 1.26 or later.
+
+NOTES:
+
+* The `make install` target is gone. It installed an unsigned local build as version 0.1.0 under `~/.terraform.d/plugins`, which stops Terraform from downloading the released provider and fails `terraform init` in configurations whose lock file records the release. Use `make build` with `dev_overrides` instead (see README.md).
+
 ## 0.1.0 (October 8, 2026)
 
-First public release, published to the Terraform Registry as `flaggr-dev/flaggr`.
+First public release, as `flaggr-dev/flaggr`.
 
 FEATURES:
 

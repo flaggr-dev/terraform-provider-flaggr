@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -263,20 +264,33 @@ func (r *FlagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	// The flag is addressed by key, service and environment, as Read and Delete
+	// do. None of them can change in place (each forces a replacement).
+	key, serviceID, environment, err := parseCompositeID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error parsing flag ID", err.Error())
+		return
+	}
+
 	input := map[string]interface{}{
 		"name":         plan.Name.ValueString(),
 		"enabled":      plan.Enabled.ValueBool(),
 		"defaultValue": defaultValue,
-		"serviceId":    plan.ServiceID.ValueString(),
-		"environment":  plan.Environment.ValueString(),
 		"isPublic":     plan.IsPublic.ValueBool(),
 	}
 	if !plan.Description.IsNull() {
 		input["description"] = plan.Description.ValueString()
 	}
 
-	flag, err := r.client.UpdateFlag(ctx, plan.Key.ValueString(), input)
+	flag, err := r.client.UpdateFlag(ctx, key, serviceID, environment, input)
 	if err != nil {
+		// Returning without a new state keeps the flag's previous state, which
+		// is still true: a change request changes nothing until it's applied.
+		var changeRequest *client.ChangeRequestError
+		if errors.As(err, &changeRequest) {
+			resp.Diagnostics.AddError("Flag change needs approval", changeRequestDetail(changeRequest))
+			return
+		}
 		resp.Diagnostics.AddError("Error updating flag", err.Error())
 		return
 	}
@@ -286,6 +300,21 @@ func (r *FlagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	plan.UpdatedAt = types.StringValue(flag.UpdatedAt)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// changeRequestDetail explains a flag update that Flaggr turned into a change
+// request: nothing changed, and running apply again opens another request.
+func changeRequestDetail(err *client.ChangeRequestError) string {
+	request := "a change request"
+	if err.ChangeRequestID != "" {
+		request = fmt.Sprintf("change request %s", err.ChangeRequestID)
+	}
+	return fmt.Sprintf(
+		"The %s environment requires approval, so Flaggr didn't change the flag: it opened %s with this change instead. "+
+			"Approve and apply the change request in Flaggr; the next terraform plan then shows no changes for this flag. "+
+			"Running terraform apply again before that opens another change request.",
+		err.Environment, request,
+	)
 }
 
 func (r *FlagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

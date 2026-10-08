@@ -79,7 +79,7 @@ func (p *FlaggrProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if apiToken == "" {
 		resp.Diagnostics.AddError(
 			"Missing API Token",
-			"The provider requires a Flaggr personal access token. Set it via the api_token attribute or the FLAGGR_API_TOKEN environment variable.",
+			"The provider needs a Flaggr API token: a personal access token (fgp_…) or a project API token (fgr_…). Set it with the api_token argument or the FLAGGR_API_TOKEN environment variable.",
 		)
 		return
 	}
