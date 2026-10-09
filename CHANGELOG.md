@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+NOTES:
+
+* docs/resources/project: The page now explains what an update to a project sends, that removing `description` from the configuration clears it in Flaggr (including one set in the dashboard), and that a project can't move to another organization, with the steps to re-create it in the other one.
+
 ## 0.1.1 (October 9, 2026)
 
 BUG FIXES:
