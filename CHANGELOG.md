@@ -6,6 +6,10 @@ BUG FIXES:
 
 * resource/flaggr_flag, resource/flaggr_service, resource/flaggr_organization, resource/flaggr_alert_rule, resource/flaggr_environment: Removing `description` from the configuration now clears it in Flaggr. The provider left the description out of the update, so Flaggr kept the old text, the next refresh read it back, and every plan showed the removal again. An apply now sends an empty description. That also clears a description set outside Terraform (in the dashboard, for example) when the configuration has no `description`: to keep it, set `description` in the configuration or add `lifecycle { ignore_changes = [description] }`.
 
+SECURITY:
+
+* Release binaries are built with Go 1.27.2 and golang.org/x/net v0.60.0, which fix GO-2026-6603, GO-2026-6605, GO-2026-6607, GO-2026-6608, GO-2026-6610, GO-2026-6611, GO-2026-6612, GO-2026-6613 and GO-2026-6617 in the Go standard library (net/http, its HTTP/2 code, mime/multipart and crypto/tls) and in x/net.
+
 NOTES:
 
 * docs/resources/project: The page now explains what an update to a project sends, that removing `description` from the configuration clears it in Flaggr (including one set in the dashboard), and that a project can't move to another organization, with the steps to re-create it in the other one.
