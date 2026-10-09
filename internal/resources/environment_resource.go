@@ -229,13 +229,17 @@ func (r *EnvironmentResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	var state EnvironmentResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	input := map[string]interface{}{
 		"name":  plan.Name.ValueString(),
 		"order": plan.Order.ValueInt64(),
 	}
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		input["description"] = plan.Description.ValueString()
-	}
+	setUpdateDescription(input, plan.Description, state.Description)
 	if !plan.Color.IsNull() && !plan.Color.IsUnknown() {
 		input["color"] = plan.Color.ValueString()
 	}

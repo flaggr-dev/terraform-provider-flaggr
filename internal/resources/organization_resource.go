@@ -155,9 +155,7 @@ func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRe
 	input := map[string]interface{}{
 		"name": plan.Name.ValueString(),
 	}
-	if !plan.Description.IsNull() {
-		input["description"] = plan.Description.ValueString()
-	}
+	setUpdateDescription(input, plan.Description, state.Description)
 
 	org, err := r.client.UpdateOrganization(ctx, state.ID.ValueString(), input)
 	if err != nil {

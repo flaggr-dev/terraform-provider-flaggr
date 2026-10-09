@@ -278,9 +278,7 @@ func (r *FlagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		"defaultValue": defaultValue,
 		"isPublic":     plan.IsPublic.ValueBool(),
 	}
-	if !plan.Description.IsNull() {
-		input["description"] = plan.Description.ValueString()
-	}
+	setUpdateDescription(input, plan.Description, state.Description)
 
 	flag, err := r.client.UpdateFlag(ctx, key, serviceID, environment, input)
 	if err != nil {

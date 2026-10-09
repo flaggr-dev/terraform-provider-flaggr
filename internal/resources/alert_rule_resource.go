@@ -237,9 +237,7 @@ func (r *AlertRuleResource) Update(ctx context.Context, req resource.UpdateReque
 		"enabled":         plan.Enabled.ValueBool(),
 		"cooldownMinutes": plan.CooldownMinutes.ValueInt64(),
 	}
-	if !plan.Description.IsNull() {
-		input["description"] = plan.Description.ValueString()
-	}
+	setUpdateDescription(input, plan.Description, state.Description)
 
 	projectID, ruleID := parseCompositeIDPair(state.ID.ValueString(), state.ProjectID.ValueString())
 
