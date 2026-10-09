@@ -15,7 +15,7 @@ SECURITY:
 
 NOTES:
 
-* docs/resources/project: The page now explains what an update to a project sends, that removing `description` from the configuration clears it in Flaggr (including one set in the dashboard), and that a project can't move to another organization, with the steps to re-create it in the other one.
+* docs/resources/project: The page now explains what an update to a project sends, that removing `description` from the configuration clears it in Flaggr (including one set in the dashboard), and that a project can't move to another organization, with the steps to re-create it in the other one. It also says that a new `slug` needs a personal access token: Flaggr refuses a slug change from a project API token (`fgr_…`), and the README and the provider page list that among what a project API token can't do.
 * docs/resources/flag, docs/resources/service, docs/resources/organization, docs/resources/alert_rule, docs/resources/environment: `description` now says that an apply without it in the configuration clears the description in Flaggr, including one set outside Terraform. `flaggr_organization` `slug` and `flaggr_environment` `color` say what can't be changed.
 
 ## 0.1.1 (October 9, 2026)

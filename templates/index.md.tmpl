@@ -22,7 +22,7 @@ The Flaggr provider manages [Flaggr](https://flaggr.dev) as code: organizations 
 The provider sends a Flaggr API token to the Flaggr API (`https://flaggr.dev` unless you set `api_url`). Set it with the `FLAGGR_API_TOKEN` environment variable (recommended) or the `api_token` argument.
 
 - A **personal access token** (`fgp_…`, recommended) acts as you in every project and organization you can access, limited to the tier you chose when you created it; your own roles still apply. Create one in Flaggr under [**Profile → Personal access tokens**](https://flaggr.dev/console/profile#personal-access-tokens).
-- A **project API token** (`fgr_…`) works only for resources inside its own project: it can't create or delete projects, or manage organizations and their members.
+- A **project API token** (`fgr_…`) works only for resources inside its own project: it can't create or delete projects, change a project's slug, or manage organizations and their members.
 
 | What Terraform manages | Personal access token you need |
 |------------------------|--------------------------------|

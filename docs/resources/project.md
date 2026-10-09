@@ -24,7 +24,7 @@ resource "flaggr_project" "platform" {
 
 ## Updates and the description
 
-An update sends only the attributes that changed. Any change needs the **Admin** tier, and a new `slug` needs the project owner.
+An update sends only the attributes that changed. Any change needs the **Admin** tier, and a new `slug` needs the project owner with a personal access token: Flaggr refuses a slug change from a project API token (`fgr_…`), whoever owns the project.
 
 Removing `description` from the configuration clears it in Flaggr (the provider sends an empty description; the API keeps any field it isn't sent). That includes a description set outside Terraform, for example in the dashboard: if the configuration has no `description`, the next apply clears it. To keep it, set `description` in the configuration, or add `lifecycle { ignore_changes = [description] }`. Flaggr reads back a project without a description and one with an empty description the same way, so `description = ""` and no `description` both converge.
 
