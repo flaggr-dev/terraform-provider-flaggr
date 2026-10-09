@@ -30,7 +30,7 @@ resource "flaggr_service" "api" {
 
 ### Optional
 
-- `description` (String) Service description.
+- `description` (String) Service description. Without it in the configuration, an apply clears the service's description, including one set outside Terraform.
 
 ### Read-Only
 

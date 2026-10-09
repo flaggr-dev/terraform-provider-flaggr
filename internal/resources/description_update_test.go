@@ -298,7 +298,8 @@ func descriptionCases() []descriptionCase {
 }
 
 // updateResource runs Update the way the framework does: the response starts
-// with the plan as its new state.
+// with the prior state as its new state, so an Update that sets none (as a
+// failed one doesn't) leaves the state as it was.
 func updateResource(t *testing.T, r resource.Resource, planned, prior interface{}) resource.UpdateResponse {
 	t.Helper()
 	ctx := context.Background()
@@ -311,7 +312,7 @@ func updateResource(t *testing.T, r resource.Resource, planned, prior interface{
 	if diags := state.Set(ctx, prior); diags.HasError() {
 		t.Fatalf("state: %v", diags)
 	}
-	resp := resource.UpdateResponse{State: tfsdk.State{Schema: s, Raw: plan.Raw}}
+	resp := resource.UpdateResponse{State: tfsdk.State{Schema: s, Raw: state.Raw}}
 	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: state}, &resp)
 	return resp
 }

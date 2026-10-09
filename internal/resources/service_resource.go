@@ -64,7 +64,7 @@ func (r *ServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Service description.",
+				Description: "Service description. Without it in the configuration, an apply clears the service's description, including one set outside Terraform.",
 				Optional:    true,
 			},
 			"created_at": schema.StringAttribute{
@@ -140,9 +140,7 @@ func (r *ServiceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.Name = types.StringValue(service.Name)
 	state.Slug = types.StringValue(service.Slug)
 	state.ProjectID = types.StringValue(service.ProjectID)
-	if service.Description != "" {
-		state.Description = types.StringValue(service.Description)
-	}
+	state.Description = descriptionFromAPI(service.Description, state.Description)
 	state.CreatedAt = types.StringValue(service.CreatedAt)
 	state.UpdatedAt = types.StringValue(service.UpdatedAt)
 

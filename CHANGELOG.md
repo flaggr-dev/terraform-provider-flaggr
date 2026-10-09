@@ -5,6 +5,9 @@
 BUG FIXES:
 
 * resource/flaggr_flag, resource/flaggr_service, resource/flaggr_organization, resource/flaggr_alert_rule, resource/flaggr_environment: Removing `description` from the configuration now clears it in Flaggr. The provider left the description out of the update, so Flaggr kept the old text, the next refresh read it back, and every plan showed the removal again. An apply now sends an empty description. That also clears a description set outside Terraform (in the dashboard, for example) when the configuration has no `description`: to keep it, set `description` in the configuration or add `lifecycle { ignore_changes = [description] }`.
+* resource/flaggr_flag, resource/flaggr_service, resource/flaggr_organization, resource/flaggr_alert_rule, resource/flaggr_environment: A description that Flaggr no longer has now leaves the state at the next refresh. The refresh ignored an empty description, so the old text stayed in the state: a description cleared in the dashboard while the configuration still set one was never shown as a difference, and removing `description` from a flag in an environment that requires approval opened another change request on every apply, even after the first one was approved.
+* resource/flaggr_organization: Changing `slug` on an existing organization now fails at plan time, saying why. Flaggr can't change an organization's slug and ignored the one the update sent, so the apply reported success and recorded a slug the organization never had, the next refresh read the real one back, and every plan showed the change again. Set `slug` back to the organization's own, or create a new `flaggr_organization`.
+* resource/flaggr_environment: Removing `color` from the configuration no longer shows as a change on every plan. Flaggr can't clear a color (it only takes a hex color), so the environment now keeps the color it has when the configuration has none, and an environment created without a `color` records the one Flaggr gives it, if any. An update names the color only when it changes.
 
 SECURITY:
 
@@ -13,6 +16,7 @@ SECURITY:
 NOTES:
 
 * docs/resources/project: The page now explains what an update to a project sends, that removing `description` from the configuration clears it in Flaggr (including one set in the dashboard), and that a project can't move to another organization, with the steps to re-create it in the other one.
+* docs/resources/flag, docs/resources/service, docs/resources/organization, docs/resources/alert_rule, docs/resources/environment: `description` now says that an apply without it in the configuration clears the description in Flaggr, including one set outside Terraform. `flaggr_organization` `slug` and `flaggr_environment` `color` say what can't be changed.
 
 ## 0.1.1 (October 9, 2026)
 

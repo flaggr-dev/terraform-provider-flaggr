@@ -69,7 +69,7 @@ func (r *AlertRuleResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Rule description.",
+				Description: "Rule description. Without it in the configuration, an apply clears the rule's description, including one set outside Terraform.",
 				Optional:    true,
 			},
 			"severity": schema.StringAttribute{
@@ -197,9 +197,7 @@ func (r *AlertRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 	state.ProjectID = types.StringValue(rule.ProjectID)
 	state.CreatedAt = types.StringValue(rule.CreatedAt)
 	state.UpdatedAt = types.StringValue(rule.UpdatedAt)
-	if rule.Description != "" {
-		state.Description = types.StringValue(rule.Description)
-	}
+	state.Description = descriptionFromAPI(rule.Description, state.Description)
 
 	// Serialize channels back to JSON
 	channelsJSON, _ := jsonMarshal(rule.Channels)

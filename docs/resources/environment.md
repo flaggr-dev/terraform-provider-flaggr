@@ -45,8 +45,8 @@ resource "flaggr_environment" "production_eu" {
 
 ### Optional
 
-- `color` (String) Hex color for UI (e.g., #3b82f6).
-- `description` (String) Environment description.
+- `color` (String) Hex color for UI (e.g., #3b82f6). Flaggr can't clear a color: without it in the configuration, the environment keeps the color it has, if any.
+- `description` (String) Environment description. Without it in the configuration, an apply clears the environment's description, including one set outside Terraform.
 - `order` (Number) Pipeline order (lower = earlier in pipeline).
 - `protected_environment` (Boolean) Whether this is a protected environment.
 - `require_approval` (Boolean) Whether promotions to this environment require approval.

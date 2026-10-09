@@ -83,7 +83,7 @@ In an environment that is protected and requires approval (`protected_environmen
 
 ### Optional
 
-- `description` (String) Flag description.
+- `description` (String) Flag description. Without it in the configuration, an apply clears the flag's description, including one set outside Terraform.
 - `enabled` (Boolean) Whether the flag is enabled.
 - `environment` (String) Environment (development, staging, production).
 - `is_public` (Boolean) Whether the flag can be evaluated without authentication.

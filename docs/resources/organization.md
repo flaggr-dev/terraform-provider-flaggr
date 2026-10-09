@@ -26,11 +26,11 @@ resource "flaggr_organization" "acme" {
 ### Required
 
 - `name` (String) Organization name.
-- `slug` (String) URL-friendly identifier.
+- `slug` (String) URL-friendly identifier. Set when the organization is created: Flaggr can't change an organization's slug, so changing it on an existing organization is an error.
 
 ### Optional
 
-- `description` (String) Organization description.
+- `description` (String) Organization description. Without it in the configuration, an apply clears the organization's description, including one set outside Terraform.
 
 ### Read-Only
 

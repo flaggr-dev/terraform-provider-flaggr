@@ -62,7 +62,7 @@ resource "flaggr_alert_rule" "slow_evaluations" {
 ### Optional
 
 - `cooldown_minutes` (Number) Minimum minutes between incidents for this rule; an open incident is not re-notified.
-- `description` (String) Rule description.
+- `description` (String) Rule description. Without it in the configuration, an apply clears the rule's description, including one set outside Terraform.
 - `enabled` (Boolean) Whether the rule is enabled.
 
 ### Read-Only

@@ -76,7 +76,7 @@ func (r *FlagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Flag description.",
+				Description: "Flag description. Without it in the configuration, an apply clears the flag's description, including one set outside Terraform.",
 				Optional:    true,
 			},
 			"type": schema.StringAttribute{
@@ -233,9 +233,7 @@ func (r *FlagResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	state.ServiceID = types.StringValue(flag.ServiceID)
 	state.Environment = types.StringValue(flag.Environment)
 	state.IsPublic = types.BoolValue(flag.IsPublic)
-	if flag.Description != "" {
-		state.Description = types.StringValue(flag.Description)
-	}
+	state.Description = descriptionFromAPI(flag.Description, state.Description)
 
 	defaultValueJSON, _ := json.Marshal(flag.DefaultValue)
 	state.DefaultValue = types.StringValue(string(defaultValueJSON))

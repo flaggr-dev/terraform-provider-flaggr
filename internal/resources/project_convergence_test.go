@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -171,15 +172,23 @@ func (f *fakeProjectsAPI) readsSoFar() int {
 	return f.reads
 }
 
-// projectHarness talks to the real provider over the protocol, configured
-// against a fake API.
-type projectHarness struct {
-	t      *testing.T
-	server tfprotov6.ProviderServer
-	schema *tfprotov6.Schema
+// resourceHarness talks to the real provider over the protocol, configured
+// against a fake API, about one of its resource types.
+type resourceHarness struct {
+	t        *testing.T
+	typeName string
+	server   tfprotov6.ProviderServer
+	schema   *tfprotov6.Schema
 }
 
-func newProjectHarness(t *testing.T, api *fakeProjectsAPI) *projectHarness {
+func newProjectHarness(t *testing.T, api *fakeProjectsAPI) *resourceHarness {
+	t.Helper()
+	return newResourceHarness(t, "flaggr_project", api)
+}
+
+// newResourceHarness is a harness for one resource type of the provider,
+// configured against the fake API that the handler serves.
+func newResourceHarness(t *testing.T, typeName string, api http.Handler) *resourceHarness {
 	t.Helper()
 	ctx := context.Background()
 	httpServer := httptest.NewServer(api)
@@ -208,14 +217,14 @@ func newProjectHarness(t *testing.T, api *fakeProjectsAPI) *projectHarness {
 	if err != nil || hasError(configured.Diagnostics) {
 		t.Fatalf("configure provider: %v %s", err, diagnostics(configured.Diagnostics))
 	}
-	schema, ok := schemas.ResourceSchemas["flaggr_project"]
+	schema, ok := schemas.ResourceSchemas[typeName]
 	if !ok {
-		t.Fatal("the provider has no flaggr_project resource")
+		t.Fatalf("the provider has no %s resource", typeName)
 	}
-	return &projectHarness{t: t, server: server, schema: schema}
+	return &resourceHarness{t: t, typeName: typeName, server: server, schema: schema}
 }
 
-func (h *projectHarness) dynamic(v tftypes.Value) *tfprotov6.DynamicValue {
+func (h *resourceHarness) dynamic(v tftypes.Value) *tfprotov6.DynamicValue {
 	h.t.Helper()
 	dv, err := tfprotov6.NewDynamicValue(h.schema.ValueType(), v)
 	if err != nil {
@@ -224,7 +233,7 @@ func (h *projectHarness) dynamic(v tftypes.Value) *tfprotov6.DynamicValue {
 	return &dv
 }
 
-func (h *projectHarness) value(dv *tfprotov6.DynamicValue) tftypes.Value {
+func (h *resourceHarness) value(dv *tfprotov6.DynamicValue) tftypes.Value {
 	h.t.Helper()
 	if dv == nil {
 		return tftypes.NewValue(h.schema.ValueType(), nil)
@@ -236,17 +245,37 @@ func (h *projectHarness) value(dv *tfprotov6.DynamicValue) tftypes.Value {
 	return v
 }
 
-// noProject is the prior state of a project that doesn't exist yet.
-func (h *projectHarness) noProject() tftypes.Value {
+// noResource is the prior state of a resource that doesn't exist yet.
+func (h *resourceHarness) noResource() tftypes.Value {
 	return tftypes.NewValue(h.schema.ValueType(), nil)
 }
 
-// config is a flaggr_project block setting the given attributes.
-func (h *projectHarness) config(attrs map[string]string) tftypes.Value {
+// config is a block of the resource setting the given attributes. A value is
+// given as a string, whatever the attribute's type: "true" for a bool, "30"
+// for a number.
+func (h *resourceHarness) config(attrs map[string]string) tftypes.Value {
+	h.t.Helper()
 	values := map[string]tftypes.Value{}
 	for _, a := range h.schema.Block.Attributes {
 		values[a.Name] = tftypes.NewValue(a.Type, nil)
-		if v, ok := attrs[a.Name]; ok {
+		v, ok := attrs[a.Name]
+		if !ok {
+			continue
+		}
+		switch {
+		case a.Type.Equal(tftypes.Bool):
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				h.t.Fatalf("%s is a bool, not %q", a.Name, v)
+			}
+			values[a.Name] = tftypes.NewValue(tftypes.Bool, b)
+		case a.Type.Equal(tftypes.Number):
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				h.t.Fatalf("%s is a number, not %q", a.Name, v)
+			}
+			values[a.Name] = tftypes.NewValue(tftypes.Number, n)
+		default:
 			values[a.Name] = tftypes.NewValue(tftypes.String, v)
 		}
 	}
@@ -256,7 +285,7 @@ func (h *projectHarness) config(attrs map[string]string) tftypes.Value {
 // proposedNew is Terraform's proposed new state for this flat schema: the
 // configuration, except that a Computed attribute the configuration leaves
 // null keeps its prior value.
-func (h *projectHarness) proposedNew(prior, config tftypes.Value) tftypes.Value {
+func (h *resourceHarness) proposedNew(prior, config tftypes.Value) tftypes.Value {
 	cfg, pri := attrs(h.t, config), attrs(h.t, prior)
 	values := map[string]tftypes.Value{}
 	for _, a := range h.schema.Block.Attributes {
@@ -271,16 +300,16 @@ func (h *projectHarness) proposedNew(prior, config tftypes.Value) tftypes.Value 
 	return tftypes.NewValue(h.schema.ValueType(), values)
 }
 
-type projectPlan struct {
+type resourcePlan struct {
 	planned tftypes.Value
 	private []byte
 	diags   []*tfprotov6.Diagnostic
 }
 
-func (h *projectHarness) plan(prior, config tftypes.Value) projectPlan {
+func (h *resourceHarness) plan(prior, config tftypes.Value) resourcePlan {
 	h.t.Helper()
 	resp, err := h.server.PlanResourceChange(context.Background(), &tfprotov6.PlanResourceChangeRequest{
-		TypeName:         "flaggr_project",
+		TypeName:         h.typeName,
 		PriorState:       h.dynamic(prior),
 		ProposedNewState: h.dynamic(h.proposedNew(prior, config)),
 		Config:           h.dynamic(config),
@@ -289,7 +318,7 @@ func (h *projectHarness) plan(prior, config tftypes.Value) projectPlan {
 		h.t.Fatalf("plan: %v", err)
 	}
 	if hasError(resp.Diagnostics) {
-		return projectPlan{diags: resp.Diagnostics}
+		return resourcePlan{diags: resp.Diagnostics}
 	}
 	planned := h.value(resp.PlannedState)
 	// Terraform's own check of a plan: an attribute plans its configured
@@ -306,13 +335,13 @@ func (h *projectHarness) plan(prior, config tftypes.Value) projectPlan {
 			h.t.Fatalf("invalid plan: %s planned %s for configured %s", a.Name, p, c)
 		}
 	}
-	return projectPlan{planned: planned, private: resp.PlannedPrivate, diags: resp.Diagnostics}
+	return resourcePlan{planned: planned, private: resp.PlannedPrivate, diags: resp.Diagnostics}
 }
 
-func (h *projectHarness) apply(prior, config tftypes.Value, plan projectPlan) (tftypes.Value, []*tfprotov6.Diagnostic) {
+func (h *resourceHarness) apply(prior, config tftypes.Value, plan resourcePlan) (tftypes.Value, []*tfprotov6.Diagnostic) {
 	h.t.Helper()
 	resp, err := h.server.ApplyResourceChange(context.Background(), &tfprotov6.ApplyResourceChangeRequest{
-		TypeName:       "flaggr_project",
+		TypeName:       h.typeName,
 		PriorState:     h.dynamic(prior),
 		PlannedState:   h.dynamic(plan.planned),
 		Config:         h.dynamic(config),
@@ -341,13 +370,13 @@ func (h *projectHarness) apply(prior, config tftypes.Value, plan projectPlan) (t
 
 // destroy is the delete half of a replacement: Terraform applies a null
 // planned state over the prior one.
-func (h *projectHarness) destroy(prior tftypes.Value) {
+func (h *resourceHarness) destroy(prior tftypes.Value) {
 	h.t.Helper()
 	resp, err := h.server.ApplyResourceChange(context.Background(), &tfprotov6.ApplyResourceChangeRequest{
-		TypeName:     "flaggr_project",
+		TypeName:     h.typeName,
 		PriorState:   h.dynamic(prior),
-		PlannedState: h.dynamic(h.noProject()),
-		Config:       h.dynamic(h.noProject()),
+		PlannedState: h.dynamic(h.noResource()),
+		Config:       h.dynamic(h.noResource()),
 	})
 	if err != nil || hasError(resp.Diagnostics) {
 		h.t.Fatalf("destroy: %v %s", err, diagnostics(resp.Diagnostics))
@@ -357,10 +386,10 @@ func (h *projectHarness) destroy(prior tftypes.Value) {
 	}
 }
 
-func (h *projectHarness) read(state tftypes.Value) tftypes.Value {
+func (h *resourceHarness) read(state tftypes.Value) tftypes.Value {
 	h.t.Helper()
 	resp, err := h.server.ReadResource(context.Background(), &tfprotov6.ReadResourceRequest{
-		TypeName:     "flaggr_project",
+		TypeName:     h.typeName,
 		CurrentState: h.dynamic(state),
 	})
 	if err != nil || hasError(resp.Diagnostics) {
@@ -369,11 +398,11 @@ func (h *projectHarness) read(state tftypes.Value) tftypes.Value {
 	return h.value(resp.NewState)
 }
 
-// importProject is `terraform import`: the imported state, then a refresh.
-func (h *projectHarness) importProject(id string) tftypes.Value {
+// importResource is `terraform import`: the imported state, then a refresh.
+func (h *resourceHarness) importResource(id string) tftypes.Value {
 	h.t.Helper()
 	resp, err := h.server.ImportResourceState(context.Background(), &tfprotov6.ImportResourceStateRequest{
-		TypeName: "flaggr_project",
+		TypeName: h.typeName,
 		ID:       id,
 	})
 	if err != nil || hasError(resp.Diagnostics) || len(resp.ImportedResources) != 1 {
@@ -385,7 +414,7 @@ func (h *projectHarness) importProject(id string) tftypes.Value {
 // applyAndConverge is `terraform apply` of a configuration with changes,
 // followed by `terraform plan`: the refresh must read back what the apply
 // wrote, and the plan must then be empty. It returns the refreshed state.
-func (h *projectHarness) applyAndConverge(prior, config tftypes.Value) tftypes.Value {
+func (h *resourceHarness) applyAndConverge(prior, config tftypes.Value) tftypes.Value {
 	h.t.Helper()
 	plan := h.plan(prior, config)
 	if hasError(plan.diags) {
@@ -406,7 +435,7 @@ func (h *projectHarness) applyAndConverge(prior, config tftypes.Value) tftypes.V
 	return refreshed
 }
 
-func (h *projectHarness) planIsEmpty(state, config tftypes.Value) {
+func (h *resourceHarness) planIsEmpty(state, config tftypes.Value) {
 	h.t.Helper()
 	plan := h.plan(state, config)
 	if hasError(plan.diags) {
@@ -473,7 +502,7 @@ func TestProjectRemovingTheDescriptionConverges(t *testing.T) {
 	api := newFakeProjectsAPI(myApp())
 	h := newProjectHarness(t, api)
 
-	state := h.applyAndConverge(h.importProject("p1"), h.config(map[string]string{"name": "My app", "slug": "my-app"}))
+	state := h.applyAndConverge(h.importResource("p1"), h.config(map[string]string{"name": "My app", "slug": "my-app"}))
 
 	if got := attrs(t, state)["description"]; !got.IsNull() {
 		t.Fatalf("description = %s, want none", got)
@@ -492,7 +521,7 @@ func TestProjectRemovingTheDescriptionConverges(t *testing.T) {
 func TestProjectOrganizationChangeIsRefusedAtPlan(t *testing.T) {
 	api := newFakeProjectsAPI(myApp())
 	h := newProjectHarness(t, api)
-	state := h.importProject("p1")
+	state := h.importResource("p1")
 	reads := api.readsSoFar()
 
 	plan := h.plan(state, h.config(map[string]string{"name": "My app", "slug": "my-app", "description": "Flags", "organization_id": "org-2"}))
@@ -526,7 +555,7 @@ func TestProjectOrganizationChangeIsRefusedAtPlan(t *testing.T) {
 func TestProjectOrganizationOverNoneRecordedConverges(t *testing.T) {
 	api := newFakeProjectsAPI(myApp())
 	h := newProjectHarness(t, api)
-	prior := withAttr(t, h.importProject("p1"), "organization_id", nullString)
+	prior := withAttr(t, h.importResource("p1"), "organization_id", nullString)
 
 	state := h.applyAndConverge(prior, h.config(map[string]string{"name": "My app", "slug": "my-app", "description": "Flags", "organization_id": "org-1"}))
 
@@ -546,7 +575,7 @@ func TestProjectOrganizationOverNoneRecordedConverges(t *testing.T) {
 func TestProjectOrganizationOverNoneRecordedMustBeTheProjects(t *testing.T) {
 	api := newFakeProjectsAPI(myApp())
 	h := newProjectHarness(t, api)
-	prior := withAttr(t, h.importProject("p1"), "organization_id", nullString)
+	prior := withAttr(t, h.importResource("p1"), "organization_id", nullString)
 	config := h.config(map[string]string{"name": "Renamed", "slug": "my-app", "description": "Flags", "organization_id": "org-2"})
 
 	plan := h.plan(prior, config)
@@ -570,7 +599,7 @@ func TestProjectInNoOrganizationRefusesOneAtPlan(t *testing.T) {
 	inNone.OrgID = ""
 	api := newFakeProjectsAPI(inNone)
 	h := newProjectHarness(t, api)
-	state := h.importProject("p1")
+	state := h.importResource("p1")
 	if got := attrs(t, state)["organization_id"]; !got.IsNull() {
 		t.Fatalf("organization_id = %s, want none", got)
 	}
@@ -603,7 +632,7 @@ func TestProjectInNoOrganizationRefusesOneAtPlan(t *testing.T) {
 func TestProjectTaintedIsRecreatedInAnotherOrganization(t *testing.T) {
 	api := newFakeProjectsAPI(myApp())
 	h := newProjectHarness(t, api)
-	state := h.importProject("p1")
+	state := h.importResource("p1")
 	config := h.config(map[string]string{"name": "My app", "slug": "my-app", "description": "Flags", "organization_id": "org-2"})
 
 	// The plan `terraform apply -replace` and `terraform destroy` start with.
@@ -618,7 +647,7 @@ func TestProjectTaintedIsRecreatedInAnotherOrganization(t *testing.T) {
 	// After `terraform taint`: destroy, then create (applyAndConverge plans
 	// the new project over none, as Terraform does for a tainted one).
 	h.destroy(state)
-	replaced := h.applyAndConverge(h.noProject(), config)
+	replaced := h.applyAndConverge(h.noResource(), config)
 
 	if got := attrs(t, replaced); !got["organization_id"].Equal(str("org-2")) || got["id"].Equal(str("p1")) {
 		t.Fatalf("replacement = %s", replaced)
@@ -638,7 +667,7 @@ func TestProjectCreatedConvergesWithOrWithoutAnOrganization(t *testing.T) {
 		api.defaultOrg = org
 		h := newProjectHarness(t, api)
 
-		state := h.applyAndConverge(h.noProject(), h.config(map[string]string{"name": "My app", "slug": "my-app"}))
+		state := h.applyAndConverge(h.noResource(), h.config(map[string]string{"name": "My app", "slug": "my-app"}))
 
 		want := nullString
 		if org != "" {
@@ -655,7 +684,7 @@ func TestProjectCreatedConvergesWithOrWithoutAnOrganization(t *testing.T) {
 func TestProjectDescriptionClearedOutsideTerraformIsPutBack(t *testing.T) {
 	api := newFakeProjectsAPI(myApp())
 	h := newProjectHarness(t, api)
-	state := h.importProject("p1")
+	state := h.importResource("p1")
 	config := h.config(map[string]string{"name": "My app", "slug": "my-app", "description": "Flags"})
 
 	api.mu.Lock()
@@ -683,7 +712,7 @@ func TestProjectEmptyDescriptionConverges(t *testing.T) {
 	api.defaultOrg = "org-1"
 	h := newProjectHarness(t, api)
 
-	state := h.applyAndConverge(h.noProject(), h.config(map[string]string{"name": "My app", "slug": "my-app", "description": ""}))
+	state := h.applyAndConverge(h.noResource(), h.config(map[string]string{"name": "My app", "slug": "my-app", "description": ""}))
 	if got := attrs(t, state)["description"]; !got.Equal(str("")) {
 		t.Fatalf("description = %s, want \"\"", got)
 	}

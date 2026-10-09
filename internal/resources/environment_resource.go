@@ -75,12 +75,16 @@ func (r *EnvironmentResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Environment description.",
+				Description: "Environment description. Without it in the configuration, an apply clears the environment's description, including one set outside Terraform.",
 				Optional:    true,
 			},
 			"color": schema.StringAttribute{
-				Description: "Hex color for UI (e.g., #3b82f6).",
+				Description: "Hex color for UI (e.g., #3b82f6). Flaggr can't clear a color: without it in the configuration, the environment keeps the color it has, if any.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"order": schema.Int64Attribute{
 				Description: "Pipeline order (lower = earlier in pipeline).",
@@ -165,11 +169,25 @@ func (r *EnvironmentResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	plan.ID = types.StringValue(env.ID)
+	if plan.Color.IsUnknown() {
+		// No color configured: the state has the one Flaggr gave the
+		// environment, or none, not the plan's "known after apply".
+		plan.Color = colorFromAPI(env.Color)
+	}
 	plan.IsDefault = types.BoolValue(env.IsDefault)
 	plan.CreatedAt = types.StringValue(env.CreatedAt)
 	plan.UpdatedAt = types.StringValue(env.UpdatedAt)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// colorFromAPI is the state's color for the one the API returns: none when it
+// returns none.
+func colorFromAPI(api string) types.String {
+	if api == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(api)
 }
 
 func (r *EnvironmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -199,12 +217,8 @@ func (r *EnvironmentResource) Read(ctx context.Context, req resource.ReadRequest
 	state.CreatedAt = types.StringValue(env.CreatedAt)
 	state.UpdatedAt = types.StringValue(env.UpdatedAt)
 
-	if env.Description != "" {
-		state.Description = types.StringValue(env.Description)
-	}
-	if env.Color != "" {
-		state.Color = types.StringValue(env.Color)
-	}
+	state.Description = descriptionFromAPI(env.Description, state.Description)
+	state.Color = colorFromAPI(env.Color)
 
 	protected := false
 	approval := false
@@ -240,7 +254,10 @@ func (r *EnvironmentResource) Update(ctx context.Context, req resource.UpdateReq
 		"order": plan.Order.ValueInt64(),
 	}
 	setUpdateDescription(input, plan.Description, state.Description)
-	if !plan.Color.IsNull() && !plan.Color.IsUnknown() {
+	// Flaggr keeps the color an update doesn't name, and only takes a hex color
+	// (it can't clear one), so the request names it only when it changes. A
+	// configuration without a color plans the state's own.
+	if !plan.Color.IsNull() && !plan.Color.IsUnknown() && !plan.Color.Equal(state.Color) {
 		input["color"] = plan.Color.ValueString()
 	}
 
